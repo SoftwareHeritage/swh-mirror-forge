@@ -1,5 +1,7 @@
-swh-mirror-forge (0.0.1-1) unstable; urgency=low
+swh-mirror-forge (0.0.1-1~swh1) unstable-swh; urgency=medium
 
-  *
+  * Initial release
+  * v0.0.1
+  * First implementation on a per repository basis
 
- -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Fri, 3 Feb 2017 13:54:29 +0100
+ -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Fri, 03 Feb 2017 15:01:15 +0100
