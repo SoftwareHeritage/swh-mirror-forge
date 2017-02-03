@@ -113,8 +113,8 @@ def retrieve_repo_information(data):
               help="Repository's callsign")
 @click.option('--credential-key-id',
               help="credential to use for access from phabricator's forge to github")
-@click.option('--github/--nogithub', default=True)
-def run(repo_callsign, credential_key_id, github):
+@click.option('--dry-run/--no-dry-run', default=False)
+def run(repo_callsign, credential_key_id, dry_run):
     """This will instantiate a mirror from a repository forge to github.
 
     Args:
@@ -125,10 +125,11 @@ def run(repo_callsign, credential_key_id, github):
         credential_key_id: the key the forge will use to push to
                            modifications to github
 
-        github: to inhibit the mirror creation in github. By default,
-                it creates it. Note that, in any case, a check is done
-                to stop if a mirror uri is already referenced in the
-                forge about github.
+        dry_run: if True, inhibit the mirror creation (no write is
+                done to either github) or the forge.  Otherwise, the
+                default, it creates the mirror to github. Also, a
+                check is done to stop if a mirror uri is already
+                referenced in the forge about github.
 
     """
     ### Retrieve credential access to github and phabricator's forge
@@ -149,14 +150,12 @@ def run(repo_callsign, credential_key_id, github):
 
     repository_information = data[0]
 
-    if mirror_exists(repository_information):
-        print('Mirror already configured for %s, stopping.' % repo_callsign)
-        sys.exit(0)
-
-    repo = retrieve_repo_information(repository_information)
-
     ### Create repository in github
-    if github:
+    if not dry_run:
+        if mirror_exists(repository_information):
+            print('Mirror already configured for %s, stopping.' % repo_callsign)
+            sys.exit(0)
+
         r = requests.post(
             'https://api.github.com/orgs/SoftwareHeritage/repos',
             headers={'Authorization': 'token %s' % token_github},
@@ -175,6 +174,8 @@ def run(repo_callsign, credential_key_id, github):
 Status: %s""" % r.status_code)
             sys.exit(1)
 
+    repo = retrieve_repo_information(repository_information)
+
     ### Retrieve credential information
 
     query = PassphraseSearch(FORGE_API_URL, token_forge)
@@ -187,15 +188,18 @@ Status: %s""" % r.status_code)
 
     ### Install the github mirror in the forge
 
-    query = DiffusionUriEdit(FORGE_API_URL, token_forge)
-    data = query.request(transactions=[
-        {"type": "repository", "value": repo['phid']},
-        {"type": "uri", "value": repo['url_github']},
-        {"type": "io", "value": "mirror"},
-        {"type": "display", "value": "never"},
-        {"type": "disable", "value": False},
-        {"type": "credential", "value": key_phid},
-    ])
+    if not dry_run:
+        query = DiffusionUriEdit(FORGE_API_URL, token_forge)
+        data = query.request(transactions=[
+            {"type": "repository", "value": repo['phid']},
+            {"type": "uri", "value": repo['url_github']},
+            {"type": "io", "value": "mirror"},
+            {"type": "display", "value": "never"},
+            {"type": "disable", "value": False},
+            {"type": "credential", "value": key_phid},
+        ])
+    else:
+        print("**dry run**")
 
     print("Repository %s mirrored at %s." % (repo['url'], repo['url_github']))
     sys.exit(0)
