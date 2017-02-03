@@ -23,9 +23,5 @@ Docs:
 For now, on a per repository basis:
 
 ```sh
-python3 -m swh.mirror.forge.sync --repo-callsign DMOD \
-                                 --repo-name swh-model \
-                                 --repo-url https://forge.softwareheritage.org/source/swh-model/ \
-                                 --repo-description "" \
-                                 --credential-key-id 3
+python3 -m swh.mirror.forge.sync --repo-callsign DMOD --credential-key-id 3
 ```
