@@ -73,8 +73,27 @@ def run(repo_callsign, repo_name, repo_url, repo_description,
     ### Retrieve credential access to github and phabricator's forge
     token_forge, token_github = prepare_token()
 
-    if github:
-        ### Create repository in github
+    ### Retrieve repository information
+
+    query = RepositorySearch(FORGE_API_URL, token_forge)
+    data = query.request(constraints={
+        "callsigns": [repo_callsign],
+    }, attachments={
+        "uris": True
+    })
+
+    repo_phid = data[0]['phid']
+
+    ### Check existence of mirror already set
+
+    for uri in data[0]['attachments']['uris']['uris']:
+        for url in uri['fields']['uri'].values():
+            if 'github' in url:
+                print('Mirror already installed at %s, stopping.' % url)
+                sys.exit(0)
+
+    ### Create repository in github
+    if github or mirror:
         r = requests.post(
             'https://api.github.com/orgs/SoftwareHeritage/repos',
             headers={'Authorization': 'token %s' % token_github},
@@ -92,15 +111,6 @@ def run(repo_callsign, repo_name, repo_url, repo_description,
             print("""Failure to create the repository in github.
 Status: %s""" % r.status_code)
             sys.exit(1)
-
-    ### Retrieve repository information
-
-    query = RepositorySearch(FORGE_API_URL, token_forge)
-    data = query.request(constraints={
-        "callsigns": [repo_callsign]
-    })
-
-    repo_phid = data[0]['phid']
 
     ### Retrieve credential information
 
