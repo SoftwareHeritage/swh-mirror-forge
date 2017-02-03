@@ -1,8 +1,10 @@
-swh-mirror-forge (0.0.1-1~swh1~bpo9+1) stretch-swh; urgency=medium
+swh-mirror-forge (0.0.2-1~swh1) unstable-swh; urgency=medium
 
-  * Rebuild for stretch-backports.
+  * v0.0.2
+  * Simplify command to mirror a repository, only a callsign and a
+  * credential key is needed
 
- -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Fri, 03 Feb 2017 15:01:15 +0100
+ -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Fri, 03 Feb 2017 16:28:01 +0100
 
 swh-mirror-forge (0.0.1-1~swh1) unstable-swh; urgency=medium
 

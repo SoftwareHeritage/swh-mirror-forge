@@ -8,6 +8,8 @@ import json
 import sys
 import requests
 
+from os.path import basename
+
 from swh.core.config import SWHConfig
 from .api import RepositorySearch, PassphraseSearch, DiffusionUriEdit
 
@@ -63,21 +65,70 @@ script again.
     return token_forge, token_github
 
 
+def mirror_exists(data):
+    """Check the existence of the mirror.
+
+    Args:
+        data: full information on the repository
+
+    Returns
+        True if mirror already exists. False otherwise.
+
+    """
+    uris = data['attachments']['uris']['uris']
+    for uri in uris:
+        effective_url = uri['fields']['uri']['effective']
+        if 'github' in effective_url:
+            return True
+
+    return False
+
+
+def retrieve_repo_information(data):
+    """Given information on repository, extract the needed information for mirroring.
+
+    Args:
+        data: full information on the repository
+
+    Returns:
+        dict with keys phid, description, url, name.
+
+    """
+    uris = data['attachments']['uris']['uris']
+    for uri in uris:
+        effective_url = uri['fields']['uri']['effective']
+        if 'https' in effective_url and '.git' in effective_url:
+            elected_url = effective_url
+
+    return {
+        'phid': data['phid'],
+        'description': data['fields']['name'],
+        'url': elected_url,
+        'name': basename(elected_url).split('.')[0],
+    }
+
+
 @click.command()
 @click.option('--repo-callsign',
               help="Repository's callsign")
-@click.option('--repo-name',
-              help="Repository name (used in github)")
-@click.option('--repo-url',
-              help="Repository's forge url (used in github)")
-@click.option('--repo-description',
-              help="Repository's description (used in github)")
 @click.option('--credential-key-id',
               help="credential to use for access from phabricator's forge to github")
 @click.option('--github/--nogithub', default=True)
-def run(repo_callsign, repo_name, repo_url, repo_description,
-        credential_key_id, github):
+def run(repo_callsign, credential_key_id, github):
     """This will instantiate a mirror from a repository forge to github.
+
+    Args:
+        repo_callsign: repository's identifier callsign. This will be
+                       used to fetch information on the repository to
+                       mirror.
+
+        credential_key_id: the key the forge will use to push to
+                           modifications to github
+
+        github: to inhibit the mirror creation in github. By default,
+                it creates it. Note that, in any case, a check is done
+                to stop if a mirror uri is already referenced in the
+                forge about github.
 
     """
     ### Retrieve credential access to github and phabricator's forge
@@ -92,25 +143,27 @@ def run(repo_callsign, repo_name, repo_url, repo_description,
         "uris": True
     })
 
-    repo_phid = data[0]['phid']
-
     ### Check existence of mirror already set
 
-    for uri in data[0]['attachments']['uris']['uris']:
-        for url in uri['fields']['uri'].values():
-            if 'github' in url:
-                print('Mirror already installed at %s, stopping.' % url)
-                sys.exit(0)
+    # Also determine an uri to provide as original url in the github mirror
+
+    repository_information = data[0]
+
+    if mirror_exists(repository_information):
+        print('Mirror already configured for %s, stopping.' % repo_callsign)
+        sys.exit(0)
+
+    repo = retrieve_repo_information(repository_information)
 
     ### Create repository in github
-    if github or mirror:
+    if github:
         r = requests.post(
             'https://api.github.com/orgs/SoftwareHeritage/repos',
             headers={'Authorization': 'token %s' % token_github},
             data=json.dumps({
-                "name": repo_name,
-                "description": repo_description,
-                "homepage": repo_url,
+                "name": repo['name'],
+                "description": repo['description'],
+                "homepage": repo['url'],
                 "private": False,
                 "has_issues": False,
                 "has_wiki": False,
@@ -130,21 +183,21 @@ Status: %s""" % r.status_code)
     # Retrieve the phid for that passphrase
     key_phid = list(data.values())[0]['phid']
 
-    repo_url_github = 'git@github.com:SoftwareHeritage/%s.git' % repo_name
+    repo['url_github'] = 'git@github.com:SoftwareHeritage/%s.git' % repo['name']
 
     ### Install the github mirror in the forge
 
     query = DiffusionUriEdit(FORGE_API_URL, token_forge)
     data = query.request(transactions=[
-        {"type": "repository", "value": repo_phid},
-        {"type": "uri", "value": repo_url_github},
+        {"type": "repository", "value": repo['phid']},
+        {"type": "uri", "value": repo['url_github']},
         {"type": "io", "value": "mirror"},
         {"type": "display", "value": "never"},
         {"type": "disable", "value": False},
         {"type": "credential", "value": key_phid},
     ])
 
-    print("Repository %s mirrored at %s." % (repo_url, repo_url_github))
+    print("Repository %s mirrored at %s." % (repo['url'], repo['url_github']))
     sys.exit(0)
 
 
