@@ -5,20 +5,29 @@
 
 import click
 import json
-import os
 import sys
 import requests
 
+from swh.core.config import SWHConfig
 from .api import RepositorySearch, PassphraseSearch, DiffusionUriEdit
 
 
 FORGE_API_URL = 'https://forge.softwareheritage.org'
 
 
-def load_token_from_file(filepath):
-    """Loading the token."""
-    with open(filepath, 'r') as f:
-        return f.read().strip()
+class SWHMirrorForge(SWHConfig):
+    CONFIG_BASE_FILENAME = 'mirror-forge/config'
+
+    DEFAULT_CONFIG = {
+        'github': ('str', None),
+        'forge': ('str', None),
+    }
+
+    def __init__(self):
+        super().__init__()
+        self.config = self.parse_config_file()
+        self.token_github = self.config['github']
+        self.token_forge = self.config['forge']
 
 
 def prepare_token():
@@ -28,26 +37,27 @@ def prepare_token():
         tuple (token-forge, token-github)
 
     """
-    token_forge_filepath = os.getenv("HOME") + '/.config/swh/forge-token'
-    token_forge = load_token_from_file(token_forge_filepath)
+    swh_mirror_forge = SWHMirrorForge()
+
+    token_forge = swh_mirror_forge.token_forge
     if not token_forge:
-        print("""Install the phabricator forge's token in %s
+        print("""Install the phabricator forge's token in $SWH_CONFIG_PATH/mirror-forge/config.yml
 (https://forge.softwareheritage.org/settings/user/<your-user>/page/apitokens/).
 
 Once the installation is done, you can trigger this script again.
-        """ % token_forge_filepath)
+        """)
         sys.exit(1)
 
-    token_github_filepath = os.getenv("HOME") + '/.config/swh/github-token'
-    token_github = load_token_from_file(token_github_filepath)
+    token_github = swh_mirror_forge.token_github
     if not token_github:
-        print("""Install one personal github token in %s with scope
-public_repo (https://github.com/settings/tokens).
+        print("""Install one personal github token in
+$SWH_CONFIG_PATH/mirror-forge/config.yml with scope public_repo
+(https://github.com/settings/tokens).
 
 You must be associated to https://github.com/softwareheritage
 organization.  Once the installation is done, you can trigger this
 script again.
-        """ % token_github_filepath)
+        """)
         sys.exit(1)
 
     return token_forge, token_github

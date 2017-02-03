@@ -3,3 +3,5 @@
 # dependency lines, see https://pip.readthedocs.org/en/1.1/requirements.html
 vcversioner
 requests
+
+swh.core >= 0.0.29
