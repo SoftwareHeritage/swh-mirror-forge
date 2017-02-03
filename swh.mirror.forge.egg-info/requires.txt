@@ -1,0 +1,4 @@
+click
+requests
+swh.core>=0.0.29
+vcversioner
