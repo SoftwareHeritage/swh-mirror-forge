@@ -121,15 +121,15 @@ def retrieve_repo_information(data):
     }
 
 
-def mirror_repo_to_github(repo_callsign, credential_key_id,
+def mirror_repo_to_github(repo_id, credential_key_id,
                           token_forge, token_github, dry_run=False):
     """Instantiate a mirror from a repository forge to github if it does
     not already exist.
 
     Args:
-        repo_callsign: repository's identifier callsign. This will be
-                       used to fetch information on the repository to
-                       mirror.
+        repo_id: repository's identifier (callsign, phid or id).
+                 This will be used to fetch information on the repository
+                 to mirror.
 
         credential_key_id: the key the forge will use to push to
                            modifications to github
@@ -154,9 +154,16 @@ def mirror_repo_to_github(repo_callsign, credential_key_id,
 
     """
     # Retrieve repository information
+    if isinstance(repo_id, int):
+            constraint_key = "ids"
+    elif repo_id.startswith("PHID"):
+        constraint_key = "phids"
+    else:
+        constraint_key = "callsigns"
+
     query = RepositorySearch(FORGE_API_URL, token_forge)
     data = query.request(constraints={
-        "callsigns": [repo_callsign],
+        constraint_key: [repo_id],
     }, attachments={
         "uris": True
     })
@@ -201,7 +208,7 @@ Status: %s""" % r.status_code)
     key_phid = list(data.values())[0]['phid']
 
     repo['url_github'] = 'git@github.com:SoftwareHeritage/%s.git' % (
-                         repo['name'])
+        repo['name'])
 
     # Install the github mirror in the forge
     if not dry_run:
@@ -223,18 +230,18 @@ def cli(): pass
 
 
 @cli.command()
-@click.option('--repo-callsign',
-              help="Repository's callsign")
+@click.option('--repo-id',
+              help="Repository's identifier (either callsign, id or phid)")
 @click.option('--credential-key-id',
               help="""credential to use for access from phabricator's forge to
                       github""")
 @click.option('--dry-run/--no-dry-run', default=False)
-def mirror(repo_callsign, credential_key_id, dry_run):
+def mirror(repo_id, credential_key_id, dry_run):
     """Shell interface to instantiate a mirror from a repository forge to
     github. Does nothing if the repository already exists.
 
     Args:
-        repo_callsign: repository's identifier callsign. This will be
+        repo_id: repository's identifier callsign. This will be
                        used to fetch information on the repository to
                        mirror.
 
@@ -256,7 +263,7 @@ def mirror(repo_callsign, credential_key_id, dry_run):
             print('** DRY RUN **')
 
         repo = mirror_repo_to_github(
-            repo_callsign, credential_key_id,
+            repo_id, credential_key_id,
             token_forge=token_forge,
             token_github=token_github,
             dry_run=dry_run)
@@ -265,7 +272,7 @@ def mirror(repo_callsign, credential_key_id, dry_run):
             msg = "Repository %s mirrored at %s." % (
                 repo['url'], repo['url_github'])
         else:
-            msg = 'Mirror already configured for %s, stopping.' % repo_callsign
+            msg = 'Mirror already configured for %s, stopping.' % repo_id
     except Exception as e:
         print(e)
         sys.exit(1)
@@ -283,7 +290,11 @@ class RepositoriesToMirror(RepositorySearch):
         data = super().parse_response(data)
         for entry in data:
             fields = entry['fields']
-            if 'callsign' in fields:
+            if 'id' in entry:
+                yield entry['id']
+            elif 'phidd' in entry:
+                yield entry['phid']
+            elif 'callsign' in fields:
                 yield fields['callsign']
 
 
@@ -313,20 +324,19 @@ def mirror_repos_to_github(query_name, credential_key_id,
 
     """
     query = RepositoriesToMirror(FORGE_API_URL, token_forge)
-    # query_name = 'sync-to-github-repositories'
     repositories = list(query.request(queryKey=[query_name]))
 
     if not repositories:
         return None
 
-    for repo_callsign in repositories:
-        assert repo_callsign is not None
+    for repo_id in repositories:
+        assert repo_id is not None
         try:
             if dry_run:
-                print('** DRY RUN - %s **' % repo_callsign)
+                print('** DRY RUN - %s **' % repo_id)
 
             repo = mirror_repo_to_github(
-                repo_callsign, credential_key_id,
+                repo_id, credential_key_id,
                 token_forge, token_github, dry_run)
 
             if repo:
@@ -334,7 +344,7 @@ def mirror_repos_to_github(query_name, credential_key_id,
                     repo['url'], repo['url_github'])
             else:
                 yield 'Mirror already configured for %s, stopping.' % (
-                    repo_callsign)
+                    repo_id)
         except Exception as e:
             yield str(e)
 
