@@ -319,10 +319,8 @@ def mirror_repos_to_github(query_name, credential_key_id,
     if not repositories:
         return None
 
-    errors = []
-    mirrored = []
-    skipped = []
     for repo_callsign in repositories:
+        assert repo_callsign is not None
         try:
             if dry_run:
                 print('** DRY RUN - %s **' % repo_callsign)
@@ -332,23 +330,14 @@ def mirror_repos_to_github(query_name, credential_key_id,
                 token_forge, token_github, dry_run)
 
             if repo:
-                msg = "Repository %s mirrored at %s." % (
+                yield "Repository %s mirrored at %s." % (
                     repo['url'], repo['url_github'])
-                mirrored.append(msg)
             else:
-                msg = 'Mirror already configured for %s, stopping.' % (
+                yield 'Mirror already configured for %s, stopping.' % (
                     repo_callsign)
-                skipped.append(msg)
-            print(msg)
         except Exception as e:
-            errors.append(e)
-            print(e)
+            yield str(e)
 
-    return {
-        'mirrored': mirrored,
-        'skipped': skipped,
-        'errors': errors
-    }
 
 
 @cli.command()
@@ -384,13 +373,12 @@ def mirrors(query_repositories, credential_key_id, dry_run):
     if dry_run:
         print('** DRY RUN **')
 
-    r = mirror_repos_to_github(query_name=query_repositories,
-                               credential_key_id=credential_key_id,
-                               token_forge=token_forge,
-                               token_github=token_github,
-                               dry_run=dry_run)
-
-    print(r)
+    for msg in mirror_repos_to_github(query_name=query_repositories,
+                                      credential_key_id=credential_key_id,
+                                      token_forge=token_forge,
+                                      token_github=token_github,
+                                      dry_run=dry_run):
+        print(msg)
 
 
 if __name__ == '__main__':
