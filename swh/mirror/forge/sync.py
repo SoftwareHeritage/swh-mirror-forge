@@ -260,7 +260,8 @@ def mirror(repo_callsign, credential_key_id, dry_run):
 
 
 class RepositoriesToMirror(RepositorySearch):
-    """Specific query to repository search api to yield callsigns of repository to mirror.
+    """Specific query to repository search api to yield callsigns of repository
+    to mirror.
 
     """
     def parse_response(self, data):
@@ -307,10 +308,9 @@ def mirror_repos_to_github(query_name, credential_key_id,
     mirrored = []
     skipped = []
     for repo_callsign in repositories:
-        print(repo_callsign)
         try:
             if dry_run:
-                print('** DRY RUN **')
+                print('** DRY RUN - %s **' % repo_callsign)
 
             repo = mirror_repo_to_github(
                 repo_callsign, credential_key_id,
@@ -321,7 +321,8 @@ def mirror_repos_to_github(query_name, credential_key_id,
                     repo['url'], repo['url_github'])
                 mirrored.append(msg)
             else:
-                msg = 'Mirror already configured for %s, stopping.' % repo_callsign
+                msg = 'Mirror already configured for %s, stopping.' % (
+                    repo_callsign)
                 skipped.append(msg)
             print(msg)
         except Exception as e:
@@ -353,8 +354,8 @@ def mirrors(query_repositories, credential_key_id, dry_run):
         credential_key_id: the key the forge will use to push to
                            modifications to github
 
-        query_repositories: Query's name which lists the repositories to mirror (as per your phabricator forge's
-                            setup).
+        query_repositories: Query's name which lists the repositories to mirror
+                           (as per phabricator forge's setup).
 
         dry_run: if True, inhibit the mirror creation (no write is
                 done to either github) or the forge.  Otherwise, the
