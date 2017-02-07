@@ -292,7 +292,7 @@ class RepositoriesToMirror(RepositorySearch):
             fields = entry['fields']
             if 'id' in entry:
                 yield entry['id']
-            elif 'phidd' in entry:
+            elif 'phid' in entry:
                 yield entry['phid']
             elif 'callsign' in fields:
                 yield fields['callsign']
