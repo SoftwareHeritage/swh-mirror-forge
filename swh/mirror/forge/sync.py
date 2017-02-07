@@ -92,11 +92,26 @@ def retrieve_repo_information(data):
         dict with keys phid, description, url, name.
 
     """
-    uris = data['attachments']['uris']['uris']
+    uris = [u for u in data['attachments']['uris']['uris'] if not u['fields']['disabled']]
+    elected_url = None
+
+    # Will try to retrieve the most relevant uri (https first)
     for uri in uris:
+        if uri['fields']['builtin']['protocol'] != 'https':
+            continue
+
         effective_url = uri['fields']['uri']['effective']
-        if 'https' in effective_url and '.git' in effective_url:
+        if effective_url.endswith('.git'):
             elected_url = effective_url
+            break
+
+    # then fallback to any other if no https were found
+    if not elected_url:
+        for uri in uris:
+            effective_url = uri['fields']['uri']['effective']
+            if effective_url.endswith('.git'):
+                elected_url = effective_url
+                break
 
     return {
         'phid': data['phid'],
