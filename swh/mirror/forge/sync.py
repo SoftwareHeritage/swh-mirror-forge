@@ -106,7 +106,8 @@ def retrieve_repo_information(data):
     }
 
 
-def mirror_repo_to_github(repo_callsign, credential_key_id, dry_run=False):
+def mirror_repo_to_github(repo_callsign, credential_key_id,
+                          token_forge, token_github, dry_run=False):
     """Instantiate a mirror from a repository forge to github if it does
     not already exist.
 
@@ -117,6 +118,10 @@ def mirror_repo_to_github(repo_callsign, credential_key_id, dry_run=False):
 
         credential_key_id: the key the forge will use to push to
                            modifications to github
+
+        token_forge: api token to access the forge's conduit api
+
+        token_github: api token to access github's api.
 
         dry_run: if True, inhibit the mirror creation (no write is
                 done to either github) or the forge.  Otherwise, the
@@ -133,11 +138,7 @@ def mirror_repo_to_github(repo_callsign, credential_key_id, dry_run=False):
         The detail of the error is in the message.
 
     """
-    # Retrieve credential access to github and phabricator's forge
-    token_forge, token_github = prepare_token()
-
     # Retrieve repository information
-
     query = RepositorySearch(FORGE_API_URL, token_forge)
     data = query.request(constraints={
         "callsigns": [repo_callsign],
@@ -202,14 +203,18 @@ Status: %s""" % r.status_code)
     return repo
 
 
-@click.command()
+@click.group()
+def cli(): pass
+
+
+@cli.command()
 @click.option('--repo-callsign',
               help="Repository's callsign")
 @click.option('--credential-key-id',
               help="""credential to use for access from phabricator's forge to
                       github""")
 @click.option('--dry-run/--no-dry-run', default=False)
-def run(repo_callsign, credential_key_id, dry_run):
+def mirror(repo_callsign, credential_key_id, dry_run):
     """Shell interface to instantiate a mirror from a repository forge to
     github. Does nothing if the repository already exists.
 
@@ -228,15 +233,22 @@ def run(repo_callsign, credential_key_id, dry_run):
                 referenced in the forge about github.
 
     """
+    token_forge, token_github = prepare_token()
+
     msg = ''
     try:
         if dry_run:
             print('** DRY RUN **')
+
         repo = mirror_repo_to_github(
-            repo_callsign, credential_key_id, dry_run)
+            repo_callsign, credential_key_id,
+            token_forge=token_forge,
+            token_github=token_github,
+            dry_run=dry_run)
+
         if repo:
             msg = "Repository %s mirrored at %s." % (
-                  repo['url'], repo['url_github'])
+                repo['url'], repo['url_github'])
         else:
             msg = 'Mirror already configured for %s, stopping.' % repo_callsign
     except Exception as e:
@@ -247,5 +259,123 @@ def run(repo_callsign, credential_key_id, dry_run):
         sys.exit(0)
 
 
+class RepositoriesToMirror(RepositorySearch):
+    """Specific query to repository search api to yield callsigns of repository to mirror.
+
+    """
+    def parse_response(self, data):
+        data = super().parse_response(data)
+        for entry in data:
+            fields = entry['fields']
+            if 'callsign' in fields:
+                yield fields['callsign']
+
+
+def mirror_repos_to_github(query_name, credential_key_id,
+                           token_forge, token_github, dry_run):
+    """Mirror repositories to github.
+
+    Args:
+        credential_key_id: the key the forge will use to push to
+                           modifications to github
+
+        query_name: Query's name as per your phabricator forge's
+                    setup.
+
+        token_forge: api token to access the forge's conduit api
+
+        token_github: api token to access github's api.
+
+        dry_run: if True, inhibit the mirror creation (no write is
+                done to either github) or the forge.  Otherwise, the
+                default, it creates the mirror to github. Also, a
+                check is done to stop if a mirror uri is already
+                referenced in the forge about github.
+
+    Returns:
+        dict with keys 'mirrored', 'skipped' and 'errors' keys.
+
+    """
+    query = RepositoriesToMirror(FORGE_API_URL, token_forge)
+    # query_name = 'sync-to-github-repositories'
+    repositories = list(query.request(queryKey=[query_name]))
+
+    if not repositories:
+        return None
+
+    errors = []
+    mirrored = []
+    skipped = []
+    for repo_callsign in repositories:
+        print(repo_callsign)
+        try:
+            if dry_run:
+                print('** DRY RUN **')
+
+            repo = mirror_repo_to_github(
+                repo_callsign, credential_key_id,
+                token_forge, token_github, dry_run)
+
+            if repo:
+                msg = "Repository %s mirrored at %s." % (
+                    repo['url'], repo['url_github'])
+                mirrored.append(msg)
+            else:
+                msg = 'Mirror already configured for %s, stopping.' % repo_callsign
+                skipped.append(msg)
+            print(msg)
+        except Exception as e:
+            errors.append(e)
+            print(e)
+
+    return {
+        'mirrored': mirrored,
+        'skipped': skipped,
+        'errors': errors
+    }
+
+
+@cli.command()
+@click.option('--query-repositories',
+              help="""Name of the query that lists the repositories to mirror
+                      in github.""")
+@click.option('--credential-key-id',
+              help="""credential to use for access from phabricator's forge to
+                      github""")
+@click.option('--dry-run/--no-dry-run', default=False)
+def mirrors(query_repositories, credential_key_id, dry_run):
+    """Shell interface to instantiate mirrors from a repository forge to
+    github. This uses the query_name provided to execute said query.
+    The resulting repositories is then mirrored to github if not
+    already mirrored.
+
+    Args:
+        credential_key_id: the key the forge will use to push to
+                           modifications to github
+
+        query_repositories: Query's name which lists the repositories to mirror (as per your phabricator forge's
+                            setup).
+
+        dry_run: if True, inhibit the mirror creation (no write is
+                done to either github) or the forge.  Otherwise, the
+                default, it creates the mirror to github. Also, a
+                check is done to stop if a mirror uri is already
+                referenced in the forge about github.
+
+    """
+    token_forge, token_github = prepare_token()
+
+    if dry_run:
+        print('** DRY RUN **')
+
+    r = mirror_repos_to_github(query_name=query_repositories,
+                               credential_key_id=credential_key_id,
+                               token_forge=token_forge,
+                               token_github=token_github,
+                               dry_run=dry_run)
+
+    print(r)
+
+
 if __name__ == '__main__':
-    run()
+    cli()
