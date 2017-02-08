@@ -5,13 +5,15 @@ Mirror swh's forge to github
 
 # Configuration
 
-In $SWH_CONFIG_PATH/mirror-forge/config.yml (SWH_CONFIG_PATH being in
-{/etc/softwareheritage/,~/.config/swh, ~/.swh/}), add the following
+In **$SWH_CONFIG_PATH/mirror-forge/config.yml** (SWH_CONFIG_PATH being in
+{*/etc/softwareheritage/*,*~/.config/swh*, *~/.swh/*}), add the following
 information:
 
 ```yaml
-github: <github-api-token>
-forge: <forge-api-token>
+tokens:
+  github: <github-api-token>
+  forge: <forge-api-token>
+forge_url: <your-forge-url>
 ```
 
 Docs:
@@ -25,10 +27,13 @@ Docs:
 Providing one identifier (id, phid or callsign) of a repository:
 
 ```sh
-python3 -m swh.mirror.forge.sync mirror --repo-id DMOD --credential-key-id 3 --dry-run
+python3 -m swh.mirror.forge.sync mirror \
+  --repo-id DMOD \
+  --credential-key-id 3 \
+  --dry-run
 ```
 
-This will (providing you remove the --dry-run flag):
+This will (if you remove the --dry-run flag):
 
 - retrieve information on the repository identified by the callsign
   provided as parameter (--repo-callsign).
@@ -50,13 +55,16 @@ the mirror in github.
 Providing one query:
 
 ```sh
-python3 -m swh.mirror.forge.sync mirrors --query-repositories z1zwaVy_tEDt --credential-key-id 3 --dry-run
+python3 -m swh.mirror.forge.sync mirrors \
+        --query-repositories z1zwaVy_tEDt \
+        --credential-key-id 3 \
+        --dry-run
 ```
 
-This will (providing you remove the --dry-run flag):
+This will (if you remove the --dry-run flag):
 
-- execute the query which is supposed to return the list of
-  repositories we want to mirror
+- execute the query referenced by the forge with 'z1zwaVy_tEDt' (that query
+  is supposed to return the list of repositories you want to mirror)
 
 - then loop over each repository to mirror them as described in
   previous paragraph
