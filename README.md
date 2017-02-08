@@ -20,22 +20,43 @@ Docs:
 
 # Use
 
-For now, on a per repository basis:
+## mirror only
+
+Providing one identifier (id, phid or callsign) of a repository:
 
 ```sh
-python3 -m swh.mirror.forge.sync --repo-callsign DMOD --credential-key-id 3
+python3 -m swh.mirror.forge.sync mirror --repo-id DMOD --credential-key-id 3 --dry-run
 ```
 
-# What does this do?
+This will (providing you remove the --dry-run flag):
 
-- Retrieve information on the repository identified by the callsign
+- retrieve information on the repository identified by the callsign
   provided as parameter (--repo-callsign).
 
-- Determine the repository's name, repository's forge's url,
+- determine the repository's name, repository's forge's url,
   repository's description
 
-- Create an empty repository in github with the same name, description
+- create an empty repository in github with the same name, description
   and pointing back to the origin fork using the phabricator url
 
-- Associate the github uri in the phabricator forge as a mirror. This
+- associate the github uri in the phabricator forge as a mirror. This
   uses the credential key information provided as parameter (--credential-key)
+
+All of this will lead to phabricator pushing regularly the changes to
+the mirror in github.
+
+## Through query repository listing
+
+Providing one query:
+
+```sh
+python3 -m swh.mirror.forge.sync mirrors --query-repositories z1zwaVy_tEDt --credential-key-id 3 --dry-run
+```
+
+This will (providing you remove the --dry-run flag):
+
+- execute the query which is supposed to return the list of
+  repositories we want to mirror
+
+- then loop over each repository to mirror them as described in
+  previous paragraph
