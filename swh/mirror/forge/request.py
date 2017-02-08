@@ -7,10 +7,9 @@
 
 """
 
-import json
+import requests
 
 from abc import ABCMeta, abstractmethod
-from subprocess import PIPE, Popen, check_output
 
 
 class Request(metaclass=ABCMeta):
@@ -32,10 +31,17 @@ class Request(metaclass=ABCMeta):
     def parse_response(self, data):
         """Parsing the query response. By default, identity function.
 
-        """
-        return data
+        Args:
+            data: dict of data returned by the post query to
+            phabricator's api.
 
-    def request(self, **kwargs):
+        Returns:
+            Dict transformed or not.
+
+        """
+        return data['data']
+
+    def post(self, **kwargs):
         """Actual execution of the request.
 
         Note: Actual implementation depends on arcanist.  I Did not
@@ -43,23 +49,68 @@ class Request(metaclass=ABCMeta):
         is no oauth session...)
 
         """
-        query = dict(**kwargs)
-        json_parameters = json.dumps(query)
+        body = dict(**kwargs)
+        body["api.token"] = self.api_token
 
-        try:
-            with Popen(['echo', json_parameters], stdout=PIPE) as dump:
-                cmd = ['arc', 'call-conduit',
-                       '--conduit-uri', self.forge_url,
-                       '--conduit-token', self.api_token,
-                       self.url()]
-                json_response = check_output(cmd, stdin=dump.stdout,
-                                             universal_newlines=True)
-        except Exception as e:
-            raise e
-        else:
-            if json_response:
-                data = json.loads(json_response)
 
-                if 'errorMessage' in data and data['errorMessage'] is not None:
-                    raise ValueError("Error: %s" % data['errorMessage'])
-                return self.parse_response(data['response'])
+        r = requests.post('%s/api/%s' % (self.forge_url, self.url()),
+                          data=body)
+
+        if r.ok:
+            data = r.json()
+            if 'error_code' in data and data['error_code'] is not None:
+                raise ValueError("Error: %s - %s" % (
+                    data['error_code'], data['error_info']))
+
+            return self.parse_response(data['result'])
+
+        if 'error_code' in data and data['error_code'] is not None:
+            raise ValueError("Error: %s - %s" % (
+                data['error_code'], data['error_message']))
+
+
+class RepositorySearch(Request):
+    """Abstraction over the repository search api call.
+
+    """
+    def url(self):
+        return 'diffusion.repository.search'
+
+
+class PassphraseSearch(Request):
+    """Abstraction over the passphrase search api call.
+
+    """
+    def url(self):
+        return 'passphrase.query'
+
+
+class DiffusionUriEdit(Request):
+    """Abstraction over the diffusion uri edition api call.
+
+    """
+    def url(self):
+        return 'diffusion.uri.edit'
+
+
+class RepositoriesToMirror(RepositorySearch):
+    """Specific query to repository search api to yield ids (callsigns,
+       id, phid) of repository to mirror.
+
+    """
+    def parse_response(self, data):
+        data = super().parse_response(data)
+        for entry in data:
+            fields = entry['fields']
+            repo = {
+                'name': fields['name']
+            }
+            if 'id' in entry:
+                repo['id'] = entry['id']
+            elif 'phid' in entry:
+                repo['id'] = entry['phid']
+            elif 'callsign' in fields:
+                repo['id'] = fields['callsign']
+            else:
+                continue
+            yield repo

@@ -11,7 +11,8 @@ import requests
 from os.path import basename
 
 from swh.core.config import SWHConfig
-from .api import RepositorySearch, PassphraseSearch, DiffusionUriEdit
+from .request import RepositorySearch, PassphraseSearch
+from .request import DiffusionUriEdit, RepositoriesToMirror
 
 
 def mirror_exists(data):
@@ -72,23 +73,6 @@ def retrieve_repo_information(data):
         'url': elected_url,
         'name': basename(elected_url).split('.')[0],
     }
-
-
-class RepositoriesToMirror(RepositorySearch):
-    """Specific query to repository search api to yield callsigns of repository
-    to mirror.
-
-    """
-    def parse_response(self, data):
-        data = super().parse_response(data)
-        for entry in data:
-            fields = entry['fields']
-            if 'id' in entry:
-                yield entry['id']
-            elif 'phid' in entry:
-                yield entry['phid']
-            elif 'callsign' in fields:
-                yield fields['callsign']
 
 
 class SWHMirrorForge(SWHConfig):
@@ -168,14 +152,14 @@ class SWHMirrorForge(SWHConfig):
 
         # Retrieve repository information
         if isinstance(repo_id, int):
-                constraint_key = "ids"
+            constraint_key = "ids"
         elif repo_id.startswith("PHID"):
             constraint_key = "phids"
         else:
             constraint_key = "callsigns"
 
         query = RepositorySearch(forge_api_url, token_forge)
-        data = query.request(constraints={
+        data = query.post(constraints={
             constraint_key: [repo_id],
         }, attachments={
             "uris": True
@@ -217,7 +201,7 @@ class SWHMirrorForge(SWHConfig):
         # Retrieve credential information
 
         query = PassphraseSearch(forge_api_url, token_forge)
-        data = query.request(ids=[credential_key_id])
+        data = query.post(ids=[credential_key_id])
 
         # Retrieve the phid for that passphrase
         key_phid = list(data.values())[0]['phid']
@@ -228,7 +212,7 @@ class SWHMirrorForge(SWHConfig):
         # Install the github mirror in the forge
         if not dry_run:
             query = DiffusionUriEdit(forge_api_url, token_forge)
-            query.request(transactions=[
+            query.post(transactions=[
                 {"type": "repository", "value": repo['phid']},
                 {"type": "uri", "value": repo['url_github']},
                 {"type": "io", "value": "mirror"},
@@ -264,23 +248,24 @@ class SWHMirrorForge(SWHConfig):
         forge_api_url = self.forge_url
 
         query = RepositoriesToMirror(forge_api_url, token_forge)
-        repositories = list(query.request(queryKey=query_name))
+        repositories = list(query.post(queryKey=query_name))
 
         if not repositories:
             return None
 
-        for repo_id in repositories:
-            assert repo_id is not None
+        for repo in repositories:
+            repo_id = repo['id']
             try:
                 if dry_run:
-                    print('** DRY RUN - %s **' % repo_id)
+                    print("** DRY RUN - name '%s' ; id '%s' **" % (
+                        repo['name'], repo_id))
 
-                repo = self.mirror_repo_to_github(
+                repo_detail = self.mirror_repo_to_github(
                     repo_id, credential_key_id, bypass_check, dry_run)
 
-                if repo:
+                if repo_detail:
                     yield "Repository %s mirrored at %s." % (
-                        repo['url'], repo['url_github'])
+                        repo_detail['url'], repo_detail['url_github'])
                 else:
                     yield 'Mirror already configured for %s, stopping.' % (
                         repo_id)
