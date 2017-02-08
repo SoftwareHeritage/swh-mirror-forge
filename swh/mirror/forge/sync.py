@@ -158,11 +158,9 @@ class SWHMirrorForge(SWHConfig):
         else:
             constraint_key = "callsigns"
 
-        query = RepositorySearch(forge_api_url, token_forge)
-        data = query.post(constraints={
-            constraint_key: [repo_id],
-        }, attachments={
-            "uris": True
+        data = RepositorySearch(forge_api_url, token_forge).post({
+            'constraints[%s][0]' % constraint_key: repo_id,
+            'attachments[uris]': True
         })
 
         repository_information = data[0]
@@ -200,8 +198,9 @@ class SWHMirrorForge(SWHConfig):
 
         # Retrieve credential information
 
-        query = PassphraseSearch(forge_api_url, token_forge)
-        data = query.post(ids=[credential_key_id])
+        data = PassphraseSearch(forge_api_url, token_forge).post({
+            'ids[0]': credential_key_id
+        })
 
         # Retrieve the phid for that passphrase
         key_phid = list(data.values())[0]['phid']
@@ -211,15 +210,20 @@ class SWHMirrorForge(SWHConfig):
 
         # Install the github mirror in the forge
         if not dry_run:
-            query = DiffusionUriEdit(forge_api_url, token_forge)
-            query.post(transactions=[
-                {"type": "repository", "value": repo['phid']},
-                {"type": "uri", "value": repo['url_github']},
-                {"type": "io", "value": "mirror"},
-                {"type": "display", "value": "never"},
-                {"type": "disable", "value": False},
-                {"type": "credential", "value": key_phid},
-            ])
+            DiffusionUriEdit(forge_api_url, token_forge).post({
+                'transactions[0][type]': 'repository',
+                'transactions[0][value]': repo['phid'],
+                'transactions[1][type]': 'uri',
+                'transactions[1][value]': repo['url_github'],
+                'transactions[2][type]': 'io',
+                'transactions[2][value]': 'mirror',
+                'transactions[3][type]': 'display',
+                'transactions[3][value]': 'never',
+                'transactions[4][type]': 'disable',
+                'transactions[4][value]': False,
+                'transactions[5][type]': 'credential',
+                'transactions[4][value]': key_phid,
+            })
 
         return repo
 
@@ -247,8 +251,9 @@ class SWHMirrorForge(SWHConfig):
         token_forge = self.token_forge
         forge_api_url = self.forge_url
 
-        query = RepositoriesToMirror(forge_api_url, token_forge)
-        repositories = list(query.post(queryKey=query_name))
+        repositories = list(
+            RepositoriesToMirror(forge_api_url, token_forge).post({
+                'queryKey': query_name}))
 
         if not repositories:
             return None

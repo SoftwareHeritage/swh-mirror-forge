@@ -16,5 +16,5 @@ Homepage: https://forge.softwareheritage.org/source/swh-mirror-forge/
 
 Package: python3-swh.mirror.forge
 Architecture: all
-Depends: arcanist, ${misc:Depends}, ${python3:Depends}
+Depends: ${misc:Depends}, ${python3:Depends}
 Description: Software Heritage Mirror Forge

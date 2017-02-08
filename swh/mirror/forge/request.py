@@ -41,17 +41,14 @@ class Request(metaclass=ABCMeta):
         """
         return data['data']
 
-    def post(self, **kwargs):
+    def post(self, body):
         """Actual execution of the request.
 
-        Note: Actual implementation depends on arcanist.  I Did not
-        yet find the right way to use 'requests' with api token (that
-        is no oauth session...)
+        Args:
+            body: the payload of the request.
 
         """
-        body = dict(**kwargs)
-        body["api.token"] = self.api_token
-
+        body['api.token'] = self.api_token
 
         r = requests.post('%s/api/%s' % (self.forge_url, self.url()),
                           data=body)
