@@ -264,7 +264,7 @@ class SWHMirrorForge(SWHConfig):
         forge_api_url = self.forge_url
 
         query = RepositoriesToMirror(forge_api_url, token_forge)
-        repositories = list(query.request(queryKey=[query_name]))
+        repositories = list(query.request(queryKey=query_name))
 
         if not repositories:
             return None
