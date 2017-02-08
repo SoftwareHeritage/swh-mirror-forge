@@ -134,6 +134,7 @@ class SWHMirrorForge(SWHConfig):
     script again.""")
 
     def mirror_repo_to_github(self, repo_id, credential_key_id,
+                              bypass_check,
                               dry_run=False):
         """Instantiate a mirror from a repository forge to github if it does
         not already exist.
@@ -183,8 +184,10 @@ class SWHMirrorForge(SWHConfig):
         repository_information = data[0]
 
         # Check existence of mirror already set
-        if mirror_exists(repository_information):
-            return None
+        if mirror_exists(repository_information) and not bypass_check:
+            if not bypass_check:
+                return None
+            print('** Bypassing check as requested **')
 
         # Retrieve exhaustive information on repository
         repo = retrieve_repo_information(repository_information)
@@ -237,7 +240,7 @@ class SWHMirrorForge(SWHConfig):
         return repo
 
     def mirror_repos_to_github(self, query_name, credential_key_id,
-                               dry_run):
+                               bypass_check, dry_run):
         """Mirror repositories to github.
 
         Args:
@@ -295,8 +298,12 @@ def cli(): pass
 @click.option('--credential-key-id',
               help="""credential to use for access from phabricator's forge to
                       github""")
+@click.option('--bypass-check/--no-bypass-check',
+              help="""By default, the process of mirroring stops if a github
+                      mirror already exists. This flag bypasses the check.
+                   """)
 @click.option('--dry-run/--no-dry-run', default=False)
-def mirror(repo_id, credential_key_id, dry_run):
+def mirror(repo_id, credential_key_id, bypass_check, dry_run):
     """Shell interface to instantiate a mirror from a repository forge to
     github. Does nothing if the repository already exists.
 
@@ -323,7 +330,7 @@ def mirror(repo_id, credential_key_id, dry_run):
             print('** DRY RUN **')
 
         repo = mirror_forge.mirror_repo_to_github(
-            repo_id, credential_key_id, dry_run)
+            repo_id, credential_key_id, bypass_check, dry_run)
 
         if repo:
             msg = "Repository %s mirrored at %s." % (
@@ -345,8 +352,15 @@ def mirror(repo_id, credential_key_id, dry_run):
 @click.option('--credential-key-id',
               help="""credential to use for access from phabricator's forge to
                       github""")
-@click.option('--dry-run/--no-dry-run', default=False)
-def mirrors(query_repositories, credential_key_id, dry_run):
+@click.option('--bypass-check/--no-bypass-check',
+              default=False,
+              help="""By default, the process of mirroring stops if a github
+                      mirror already exists. This flag bypasses the check.
+                   """)
+@click.option('--dry-run/--no-dry-run', default=False,
+              help="""Do nothing but read and print what would
+                      actually happen without the flag.""")
+def mirrors(query_repositories, credential_key_id, bypass_check, dry_run):
     """Shell interface to instantiate mirrors from a repository forge to
     github. This uses the query_name provided to execute said query.
     The resulting repositories is then mirrored to github if not
@@ -374,6 +388,7 @@ def mirrors(query_repositories, credential_key_id, dry_run):
     for msg in mirror_forge.mirror_repos_to_github(
             query_name=query_repositories,
             credential_key_id=credential_key_id,
+            bypass_check=bypass_check,
             dry_run=dry_run):
         print(msg)
 
