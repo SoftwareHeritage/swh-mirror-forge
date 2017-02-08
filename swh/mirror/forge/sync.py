@@ -276,7 +276,7 @@ class SWHMirrorForge(SWHConfig):
                     print('** DRY RUN - %s **' % repo_id)
 
                 repo = self.mirror_repo_to_github(
-                    repo_id, credential_key_id, dry_run)
+                    repo_id, credential_key_id, bypass_check, dry_run)
 
                 if repo:
                     yield "Repository %s mirrored at %s." % (
