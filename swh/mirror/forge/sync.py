@@ -28,7 +28,8 @@ def mirror_exists(data):
     uris = data['attachments']['uris']['uris']
     for uri in uris:
         effective_url = uri['fields']['uri']['effective']
-        if 'github' in effective_url:
+        if 'github' in effective_url and \
+           not effective_url.endswith('github.git'):
             return True
 
     return False
