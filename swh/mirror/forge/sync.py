@@ -184,7 +184,7 @@ class SWHMirrorForge(SWHConfig):
                 headers={'Authorization': 'token %s' % token_github},
                 data=json.dumps({
                     "name": repo['name'],
-                    "description": repo['description'],
+                    "description": 'GitHub mirror of ' + repo['description'],
                     "homepage": repo['url'],
                     "private": False,
                     "has_issues": False,
