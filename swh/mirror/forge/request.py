@@ -89,6 +89,9 @@ class DiffusionUriEdit(Request):
     def url(self):
         return 'diffusion.uri.edit'
 
+    def parse_response(self, data):
+        return data
+
 
 class RepositoriesToMirror(RepositorySearch):
     """Specific query to repository search api to yield ids (callsigns,
