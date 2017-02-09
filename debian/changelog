@@ -1,8 +1,16 @@
-swh-mirror-forge (0.0.3-1~swh1~bpo9+1) stretch-swh; urgency=medium
+swh-mirror-forge (0.0.4-1~swh1) unstable-swh; urgency=medium
 
-  * Rebuild for stretch-backports.
+  * v0.0.4
+  * Make explicit in github that the org's repositories are mirrors
+  * Completely agnostify from softwareheritage (all is configured from
+  * the configuration file).
+  * Remove arcanist as runtime dependency (use pure python3 requests for
+  * api call)
+  * Unify configuration file
+  * Open the possibility to update mirror information
+  * Update 'requirements' scheme to the latest policy
 
- -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Wed, 08 Feb 2017 17:21:45 +0100
+ -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Thu, 09 Feb 2017 16:15:42 +0100
 
 swh-mirror-forge (0.0.3-1~swh1) unstable-swh; urgency=medium
 
