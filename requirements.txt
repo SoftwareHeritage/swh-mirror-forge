@@ -4,5 +4,3 @@
 vcversioner
 requests
 click
-
-swh.core >= 0.0.29
