@@ -262,7 +262,7 @@ Status: %s""" % (error_msg_action, repo['name'], r.status_code))
                 'transactions[4][type]': 'disable',
                 'transactions[4][value]': False,
                 'transactions[5][type]': 'credential',
-                'transactions[4][value]': key_phid,
+                'transactions[5][value]': key_phid,
             })
 
         return repo
