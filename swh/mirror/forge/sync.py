@@ -11,7 +11,8 @@ import requests
 from os.path import basename
 
 from swh.core.config import SWHConfig
-from .api import RepositorySearch, PassphraseSearch, DiffusionUriEdit
+from .request import RepositorySearch, PassphraseSearch
+from .request import DiffusionUriEdit, RepositoriesToMirror
 
 
 def mirror_exists(data):
@@ -27,18 +28,20 @@ def mirror_exists(data):
     uris = data['attachments']['uris']['uris']
     for uri in uris:
         effective_url = uri['fields']['uri']['effective']
-        if 'github' in effective_url:
+        if 'github' in effective_url and \
+           not effective_url.endswith('github.git'):
             return True
 
     return False
 
 
-def retrieve_repo_information(data):
+def format_repo_information(data, org_name):
     """Given information on repository, extract the needed information for
        mirroring.
 
     Args:
         data: full information on the repository
+        org_name: The github organization name
 
     Returns:
         dict with keys phid, description, url, name.
@@ -66,29 +69,14 @@ def retrieve_repo_information(data):
                 elected_url = effective_url
                 break
 
+    name = basename(elected_url).split('.')[0]
     return {
         'phid': data['phid'],
         'description': data['fields']['name'],
         'url': elected_url,
-        'name': basename(elected_url).split('.')[0],
+        'name': name,
+        'url_github': 'git@github.com:%s/%s.git' % (org_name, name),
     }
-
-
-class RepositoriesToMirror(RepositorySearch):
-    """Specific query to repository search api to yield callsigns of repository
-    to mirror.
-
-    """
-    def parse_response(self, data):
-        data = super().parse_response(data)
-        for entry in data:
-            fields = entry['fields']
-            if 'id' in entry:
-                yield entry['id']
-            elif 'phid' in entry:
-                yield entry['phid']
-            elif 'callsign' in fields:
-                yield fields['callsign']
 
 
 class SWHMirrorForge(SWHConfig):
@@ -98,40 +86,113 @@ class SWHMirrorForge(SWHConfig):
     CONFIG_BASE_FILENAME = 'mirror-forge/config'
 
     DEFAULT_CONFIG = {
-        'forge_url': ('str', 'https://forge.softwareheritage.org'),
-        'tokens': ('dict', {'github': None, 'forge': None})
+        'forge': ('dict', {
+            'api_token': None,
+            'url': 'https://forge.softwareheritage.org',
+        }),
+        'github': ('dict', {
+            'api_token': None,
+            'org': 'SoftwareHeritage',
+        })
+
     }
 
     def __init__(self):
         super().__init__()
         self.config = self.parse_config_file()
-        self.forge_url = self.config['forge_url']
-        self.token_github = self.config['tokens']['github']
-        self.token_forge = self.config['tokens']['forge']
+        self.forge_token = self.config['forge']['api_token']
+        self.forge_url = self.config['forge']['url']
+        self.github_token = self.config['github']['api_token']
+        self.github_org = self.config['github']['org']
         self._check()
 
     def _check(self):
-        """Prepare the needed token from the disk.
-
-        Returns:
-            tuple (token-forge, token-github)
+        """Check the needed tokens are set or fail with an explanatory
+           message.
 
         """
-        if not self.token_forge:
+        if not self.forge_token:
             raise ValueError("""Install the phabricator forge's token in
     $SWH_CONFIG_PATH/mirror-forge/config.yml
     (https://forge.softwareheritage.org/settings/user/<your-user>/page/apitokens/).
 
     Once the installation is done, you can trigger this script again.""")
 
-        if not self.token_github:
+        if not self.github_token:
             raise ValueError("""Install one personal github token in
     $SWH_CONFIG_PATH/mirror-forge/config.yml with scope public_repo
     (https://github.com/settings/tokens).
 
-    You must be associated to https://github.com/softwareheritage
-    organization.  Once the installation is done, you can trigger this
-    script again.""")
+    You must be associated to https://github.com/%s organization.
+    Once the installation is done, you can trigger this
+    script again.""" % self.github_org)
+
+    def get_repo_info(self, repo_id):
+        """Returns bare information on the repository identified by repo_id.
+
+        Args:
+            repo_id (int, str): Either id as int, phid as string or
+                                callsign as string identifying uniquely a
+                                repository.
+
+        Returns:
+            information on repository as dict.
+
+        """
+        # Retrieve repository information
+        if isinstance(repo_id, int):
+            constraint_key = "ids"
+        elif repo_id.startswith("PHID"):
+            constraint_key = "phids"
+        else:
+            constraint_key = "callsigns"
+
+        data = RepositorySearch(self.forge_url, self.forge_token).post({
+            'constraints[%s][0]' % constraint_key: repo_id,
+            'attachments[uris]': True
+        })
+
+        return data[0]
+
+    def create_or_update_repo_on_github(self, repo, update=False):
+        """Create or update routine on github.
+
+        Args:
+
+            repo (dict): Dictionary of information on the repository.
+            update (bool): Determine if we update the repository's
+            information or not. Default to False (so creation).
+
+        """
+
+        if update:
+            query_fn = requests.patch
+            error_msg_action = 'update'
+            api_url = 'https://api.github.com/repos/%s/%s' % (
+                self.github_org, repo['name'])
+        else:
+            query_fn = requests.post
+            error_msg_action = 'create'
+            api_url = 'https://api.github.com/orgs/%s/repos' % self.github_org
+
+        print(api_url)
+
+        r = query_fn(
+            url=api_url,
+            headers={'Authorization': 'token %s' % self.github_token},
+            data=json.dumps({
+                "name": repo['name'],
+                "description": 'GitHub mirror of ' + repo['description'],
+                "homepage": repo['url'],
+                "private": False,
+                "has_issues": False,
+                "has_wiki": False,
+                "has_downloads": True
+            }))
+
+        if not r.ok:
+            raise ValueError("""Failure to %s the repository '%s' in github.
+Status: %s""" % (error_msg_action, repo['name'], r.status_code))
 
     def mirror_repo_to_github(self, repo_id, credential_key_id,
                               bypass_check,
@@ -162,26 +223,7 @@ class SWHMirrorForge(SWHConfig):
             The detail of the error is in the message.
 
         """
-        token_forge = self.token_forge
-        token_github = self.token_github
-        forge_api_url = self.forge_url
-
-        # Retrieve repository information
-        if isinstance(repo_id, int):
-                constraint_key = "ids"
-        elif repo_id.startswith("PHID"):
-            constraint_key = "phids"
-        else:
-            constraint_key = "callsigns"
-
-        query = RepositorySearch(forge_api_url, token_forge)
-        data = query.request(constraints={
-            constraint_key: [repo_id],
-        }, attachments={
-            "uris": True
-        })
-
-        repository_information = data[0]
+        repository_information = self.get_repo_info(repo_id)
 
         # Check existence of mirror already set
         if mirror_exists(repository_information) and not bypass_check:
@@ -190,52 +232,39 @@ class SWHMirrorForge(SWHConfig):
             print('** Bypassing check as requested **')
 
         # Retrieve exhaustive information on repository
-        repo = retrieve_repo_information(repository_information)
+        repo = format_repo_information(repository_information, self.github_org)
         if not repo:
             raise ValueError('Error when trying to retrieve detailed'
                              ' information on the repository')
 
         # Create repository in github
         if not dry_run:
-            r = requests.post(
-                'https://api.github.com/orgs/SoftwareHeritage/repos',
-                headers={'Authorization': 'token %s' % token_github},
-                data=json.dumps({
-                    "name": repo['name'],
-                    "description": repo['description'],
-                    "homepage": repo['url'],
-                    "private": False,
-                    "has_issues": False,
-                    "has_wiki": False,
-                    "has_downloads": True
-                }))
-
-            if not r.ok:
-                raise ValueError("""Failure to create the repository in github.
-    Status: %s""" % r.status_code)
+            self.create_or_update_repo_on_github(repo, update=False)
 
         # Retrieve credential information
-
-        query = PassphraseSearch(forge_api_url, token_forge)
-        data = query.request(ids=[credential_key_id])
+        data = PassphraseSearch(self.forge_url, self.forge_token).post({
+            'ids[0]': credential_key_id
+        })
 
         # Retrieve the phid for that passphrase
         key_phid = list(data.values())[0]['phid']
 
-        repo['url_github'] = 'git@github.com:SoftwareHeritage/%s.git' % (
-            repo['name'])
-
         # Install the github mirror in the forge
         if not dry_run:
-            query = DiffusionUriEdit(forge_api_url, token_forge)
-            query.request(transactions=[
-                {"type": "repository", "value": repo['phid']},
-                {"type": "uri", "value": repo['url_github']},
-                {"type": "io", "value": "mirror"},
-                {"type": "display", "value": "never"},
-                {"type": "disable", "value": False},
-                {"type": "credential", "value": key_phid},
-            ])
+            DiffusionUriEdit(self.forge_url, self.forge_token).post({
+                'transactions[0][type]': 'repository',
+                'transactions[0][value]': repo['phid'],
+                'transactions[1][type]': 'uri',
+                'transactions[1][value]': repo['url_github'],
+                'transactions[2][type]': 'io',
+                'transactions[2][value]': 'mirror',
+                'transactions[3][type]': 'display',
+                'transactions[3][value]': 'never',
+                'transactions[4][type]': 'disable',
+                'transactions[4][value]': 'false',
+                'transactions[5][type]': 'credential',
+                'transactions[5][value]': key_phid,
+            })
 
         return repo
 
@@ -260,30 +289,76 @@ class SWHMirrorForge(SWHConfig):
             dict with keys 'mirrored', 'skipped' and 'errors' keys.
 
         """
-        token_forge = self.token_forge
-        forge_api_url = self.forge_url
-
-        query = RepositoriesToMirror(forge_api_url, token_forge)
-        repositories = list(query.request(queryKey=query_name))
+        repositories = list(
+            RepositoriesToMirror(self.forge_url, self.forge_token).post({
+                'queryKey': query_name}))
 
         if not repositories:
             return None
 
-        for repo_id in repositories:
-            assert repo_id is not None
+        for repo in repositories:
+            repo_id = repo['id']
             try:
                 if dry_run:
-                    print('** DRY RUN - %s **' % repo_id)
+                    print("** DRY RUN - name '%s' ; id '%s' **" % (
+                        repo['name'], repo_id))
 
-                repo = self.mirror_repo_to_github(
+                repo_detail = self.mirror_repo_to_github(
                     repo_id, credential_key_id, bypass_check, dry_run)
 
-                if repo:
+                if repo_detail:
                     yield "Repository %s mirrored at %s." % (
-                        repo['url'], repo['url_github'])
+                        repo_detail['url'], repo_detail['url_github'])
                 else:
                     yield 'Mirror already configured for %s, stopping.' % (
                         repo_id)
+            except Exception as e:
+                yield str(e)
+
+    def update_mirror_info(self, repo_id, dry_run):
+        """Given a repository identifier, retrieve information on such
+           repository and update github information on that repository.
+
+        """
+        repository_information = self.get_repo_info(repo_id)
+
+        # Retrieve exhaustive information on repository
+        repo = format_repo_information(repository_information, self.github_org)
+        if not repo:
+            raise ValueError('Error when trying to retrieve detailed'
+                             ' information on the repository')
+
+        if not dry_run:
+            self.create_or_update_repo_on_github(repo, update=True)
+
+        return repo
+
+    def update_mirrors_info(self, query_name, dry_run):
+        """Given a query name, loop over the repositories returned by such
+           query execution and update information on github for those
+           repositories.
+
+        """
+        repositories = list(
+            RepositoriesToMirror(self.forge_url, self.forge_token).post({
+                'queryKey': query_name}))
+
+        if not repositories:
+            return None
+
+        for repo in repositories:
+            repo_id = repo['id']
+            try:
+                if dry_run:
+                    print("** DRY RUN - name '%s' ; id '%s' **" % (
+                        repo['name'], repo_id))
+
+                repo_detail = self.update_mirror_info(repo_id, dry_run)
+
+                if repo_detail:
+                    yield "Github mirror %s information updated." % (
+                        repo_detail['url_github'])
+
             except Exception as e:
                 yield str(e)
 
@@ -323,6 +398,11 @@ def mirror(repo_id, credential_key_id, bypass_check, dry_run):
 
     """
     mirror_forge = SWHMirrorForge()
+
+    try:
+        repo_id = int(repo_id)
+    except:
+        pass
 
     msg = ''
     try:
@@ -390,6 +470,84 @@ def mirrors(query_repositories, credential_key_id, bypass_check, dry_run):
             credential_key_id=credential_key_id,
             bypass_check=bypass_check,
             dry_run=dry_run):
+        print(msg)
+
+
+@cli.command()
+@click.option('--repo-id',
+              help="Repository's identifier (either callsign, id or phid)")
+@click.option('--dry-run/--no-dry-run', default=False)
+def update_github_mirror(repo_id, dry_run):
+    """Shell interface to instantiate a mirror from a repository forge to
+    github. Does nothing if the repository already exists.
+
+    Args:
+        repo_id: repository's identifier callsign. This will be
+                       used to fetch information on the repository to
+                       mirror.
+
+        credential_key_id: the key the forge will use to push to
+                           modifications to github
+
+        dry_run: if True, inhibit the mirror creation (no write is
+                done to either github) or the forge.  Otherwise, the
+                default, it creates the mirror to github. Also, a
+                check is done to stop if a mirror uri is already
+                referenced in the forge about github.
+
+    """
+    mirror_forge = SWHMirrorForge()
+
+    try:
+        repo_id = int(repo_id)
+    except:
+        pass
+
+    msg = ''
+    try:
+        if dry_run:
+            print('** DRY RUN **')
+
+        repo = mirror_forge.update_mirror_info(repo_id, dry_run)
+        msg = "Github mirror information %s updated." % repo['url_github']
+    except Exception as e:
+        print(e)
+        sys.exit(1)
+    else:
+        print(msg)
+        sys.exit(0)
+
+
+@cli.command()
+@click.option('--query-repositories',
+              help="""Name of the query that lists the repositories to mirror
+                      in github.""")
+@click.option('--dry-run/--no-dry-run', default=False,
+              help="""Do nothing but read and print what would
+                      actually happen without the flag.""")
+def update_github_mirrors(query_repositories, dry_run):
+    """Shell interface to update mirrors information on github. This uses
+    the query_name provided to execute said query.  The resulting
+    repositories' github information is then updated.
+
+    Args:
+        query_repositories: Query's name which lists the repositories to mirror
+                           (as per phabricator forge's setup).
+
+        dry_run: if True, inhibit the mirror creation (no write is
+                done to either github) or the forge.  Otherwise, the
+                default, it creates the mirror to github. Also, a
+                check is done to stop if a mirror uri is already
+                referenced in the forge about github.
+
+    """
+    mirror_forge = SWHMirrorForge()
+
+    if dry_run:
+        print('** DRY RUN **')
+
+    for msg in mirror_forge.update_mirrors_info(
+            query_repositories, dry_run=dry_run):
         print(msg)
 
 

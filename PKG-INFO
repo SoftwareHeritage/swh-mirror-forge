@@ -1,6 +1,6 @@
 Metadata-Version: 1.0
 Name: swh.mirror.forge
-Version: 0.0.3
+Version: 0.0.4
 Summary: Mirror swhs forge to github
 Home-page: https://forge.softwareheritage.org/source/swh-mirror-forge/
 Author: Software Heritage developers
