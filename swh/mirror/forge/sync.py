@@ -466,6 +466,7 @@ def mirrors(query_repositories, credential_key_id, bypass_check, dry_run):
             dry_run=dry_run):
         print(msg)
 
+
 @cli.command()
 @click.option('--repo-id',
               help="Repository's identifier (either callsign, id or phid)")
