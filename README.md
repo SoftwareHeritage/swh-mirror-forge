@@ -10,10 +10,12 @@ In **$SWH_CONFIG_PATH/mirror-forge/config.yml** (SWH_CONFIG_PATH being in
 information:
 
 ```yaml
-tokens:
-  github: <github-api-token>
-  forge: <forge-api-token>
-forge_url: <your-forge-url>
+forge:
+  api_token: <forge-api-token>
+  url: <your-forge-api-url>
+github:
+  api_token: <github-api-token>
+  org: <your-org-in-github>
 ```
 
 Docs:
@@ -68,3 +70,12 @@ This will (if you remove the --dry-run flag):
 
 - then loop over each repository to mirror them as described in
   previous paragraph
+
+
+## Update mirror information
+
+To batch the mirror's information update, you can use:
+
+``` shell
+python3 -m swh.mirror.forge.sync update_github_mirrors --query-repositories z1zwaVy_tEDt --dry-run
+```
