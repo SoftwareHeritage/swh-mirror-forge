@@ -398,6 +398,11 @@ def mirror(repo_id, credential_key_id, bypass_check, dry_run):
     """
     mirror_forge = SWHMirrorForge()
 
+    try:
+        repo_id = int(repo_id)
+    except:
+        pass
+
     msg = ''
     try:
         if dry_run:
@@ -491,6 +496,11 @@ def update_github_mirror(repo_id, dry_run):
 
     """
     mirror_forge = SWHMirrorForge()
+
+    try:
+        repo_id = int(repo_id)
+    except:
+        pass
 
     msg = ''
     try:
