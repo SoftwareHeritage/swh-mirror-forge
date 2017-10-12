@@ -1,3 +1,10 @@
+swh-mirror-forge (0.0.5-1~swh1) unstable-swh; urgency=medium
+
+  * Release swh.mirror.forge version 0.0.5
+  * Update packaging runes
+
+ -- Nicolas Dandrimont <nicolas@dandrimont.eu>  Thu, 12 Oct 2017 18:07:59 +0200
+
 swh-mirror-forge (0.0.4-1~swh1) unstable-swh; urgency=medium
 
   * v0.0.4
