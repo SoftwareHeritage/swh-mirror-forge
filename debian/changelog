@@ -1,8 +1,9 @@
-swh-mirror-forge (0.0.4-1~swh1~bpo9+1) stretch-swh; urgency=medium
+swh-mirror-forge (0.0.5-1~swh1) unstable-swh; urgency=medium
 
-  * Rebuild for stretch-backports.
+  * Release swh.mirror.forge version 0.0.5
+  * Update packaging runes
 
- -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Thu, 09 Feb 2017 16:15:42 +0100
+ -- Nicolas Dandrimont <nicolas@dandrimont.eu>  Thu, 12 Oct 2017 18:07:59 +0200
 
 swh-mirror-forge (0.0.4-1~swh1) unstable-swh; urgency=medium
 
