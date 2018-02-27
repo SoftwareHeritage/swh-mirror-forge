@@ -224,6 +224,10 @@ Status: %s""" % (error_msg_action, repo['name'], r.status_code))
 
         """
         repository_information = self.get_repo_info(repo_id)
+        view_policy = repository_information['fields']['policy']['view']
+        if view_policy != 'public':
+            raise ValueError("Repository view policy for %s is not public" %
+                             repo_id)
 
         # Check existence of mirror already set
         if mirror_exists(repository_information) and not bypass_check:
