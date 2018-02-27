@@ -4,7 +4,6 @@
 # See top-level LICENSE file for more information
 
 import click
-import json
 import sys
 import requests
 
@@ -145,42 +144,65 @@ class SWHMirrorForge(SWHConfig):
 
         return data[0]
 
-    def create_or_update_repo_on_github(self, repo, update=False):
+    def create_or_update_repo_on_github(self, repo, update_only=False):
         """Create or update routine on github.
 
         Args:
 
             repo (dict): Dictionary of information on the repository.
-            update (bool): Determine if we update the repository's
-            information or not. Default to False (so creation).
+            update_only (bool): Only update repository (defaults to False).
 
         """
 
-        if update:
-            query_fn = requests.patch
-            error_msg_action = 'update'
-            api_url = 'https://api.github.com/repos/%s/%s' % (
-                self.github_org, repo['name'])
-        else:
-            query_fn = requests.post
-            error_msg_action = 'create'
-            api_url = 'https://api.github.com/orgs/%s/repos' % self.github_org
+        repo_url = 'https://api.github.com/repos/%s/%s' % (
+            self.github_org, repo['name'])
 
-        print(api_url)
+        request_headers = {
+            'Authorization': 'token %s' % self.github_token,
+        }
+
+        expected_project_data = {
+            "name": repo['name'],
+            "description": 'GitHub mirror of ' + repo['description'],
+            "homepage": repo['url'],
+            "private": False,
+            "has_issues": False,
+            "has_wiki": False,
+            "has_downloads": True,
+            "has_projects": False,
+        }
+
+        r = requests.get(repo_url, headers=request_headers)
+        if r.ok:
+            project_data = r.json()
+            if any(project_data[key] != value
+                   for key, value in expected_project_data.items()):
+                query_fn = requests.patch
+                error_msg_action = 'update'
+                api_url = repo_url
+            else:
+                print('Repo up to date: %s' % repo['name'])
+                return
+        else:
+            if not update_only and r.status_code == 404:
+                query_fn = requests.post
+                error_msg_action = 'create'
+                api_url = ('https://api.github.com/orgs/%s/repos' %
+                           self.github_org)
+            elif update_only:
+                raise ValueError(
+                    '''Tried to update a non-existing repository: %s (%s)''' %
+                    (repo['name'], r.status_code))
+            else:
+                raise ValueError(
+                    'Unexpected status code when getting repository info: %s' %
+                    r.status_code
+                )
 
         r = query_fn(
             url=api_url,
-            headers={'Authorization': 'token %s' % self.github_token},
-            data=json.dumps({
-                "name": repo['name'],
-                "description": 'GitHub mirror of ' + repo['description'],
-                "homepage": repo['url'],
-                "private": False,
-                "has_issues": False,
-                "has_wiki": False,
-                "has_downloads": True,
-                "has_projects": False,
-            }))
+            headers=request_headers,
+            data=project_data)
 
         if not r.ok:
             raise ValueError("""Failure to %s the repository '%s' in github.
@@ -246,7 +268,7 @@ Status: %s""" % (error_msg_action, repo['name'], r.status_code))
 
         # Create repository in github
         if not dry_run:
-            self.create_or_update_repo_on_github(repo, update=bool(exists))
+            self.create_or_update_repo_on_github(repo, update_only=False)
 
         transaction_data = {
             'transactions[0][type]': 'credential',
@@ -345,7 +367,7 @@ Status: %s""" % (error_msg_action, repo['name'], r.status_code))
                              ' information on the repository')
 
         if not dry_run:
-            self.create_or_update_repo_on_github(repo, update=True)
+            self.create_or_update_repo_on_github(repo, update_only=True)
 
         return repo
 
