@@ -175,7 +175,8 @@ class SWHMirrorForge(SWHConfig):
                 "private": False,
                 "has_issues": False,
                 "has_wiki": False,
-                "has_downloads": True
+                "has_downloads": True,
+                "has_projects": False,
             }))
 
         if not r.ok:
