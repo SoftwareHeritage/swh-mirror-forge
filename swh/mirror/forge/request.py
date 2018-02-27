@@ -8,6 +8,7 @@
 """
 
 import requests
+import sys
 
 from abc import ABCMeta, abstractmethod
 
@@ -56,6 +57,8 @@ class Request(metaclass=ABCMeta):
         if r.ok:
             data = r.json()
             if 'error_code' in data and data['error_code'] is not None:
+                print('Error posting %s to %s' % (body, self.url()),
+                      file=sys.stderr)
                 raise ValueError("Error: %s - %s" % (
                     data['error_code'], data['error_info']))
 
