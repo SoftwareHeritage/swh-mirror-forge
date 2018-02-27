@@ -237,10 +237,17 @@ Status: %s""" % (error_msg_action, repo['name'], r.status_code))
 
         """
         repository_information = self.get_repo_info(repo_id)
+        repo = format_repo_information(repository_information, self.forge_url,
+                                       self.github_org)
+
+        if not repo:
+            raise ValueError('Error when trying to retrieve detailed'
+                             ' information on the repository')
+
         view_policy = repository_information['fields']['policy']['view']
         if view_policy != 'public':
             raise ValueError("Repository view policy for %s is not public" %
-                             repo_id)
+                             repo['name'])
 
         # Retrieve credential information
         data = PassphraseSearch(self.forge_url, self.forge_token).post({
@@ -252,18 +259,11 @@ Status: %s""" % (error_msg_action, repo['name'], r.status_code))
 
         # Check existence of mirror already set
         exists = mirror_exists(repository_information)
-        # Retrieve exhaustive information on repository
-        repo = format_repo_information(repository_information, self.forge_url,
-                                       self.github_org)
-
-        if not repo:
-            raise ValueError('Error when trying to retrieve detailed'
-                             ' information on the repository')
 
         if (exists
                 and exists['effective'] == repo['url_github']
                 and exists['credential'] == key_phid):
-            print('Repo %s: URL already exists and matches' % repo_id)
+            print('Repo %s: URL already exists and matches' % repo['name'])
             return None
 
         # Create repository in github
@@ -348,7 +348,7 @@ Status: %s""" % (error_msg_action, repo['name'], r.status_code))
                         repo_detail['url'], repo_detail['url_github'])
                 else:
                     yield 'Mirror already configured for %s, stopping.' % (
-                        repo_id)
+                        repo['name'])
             except Exception as e:
                 yield str(e)
 
