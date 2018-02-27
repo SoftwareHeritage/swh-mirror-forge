@@ -8,8 +8,6 @@ import json
 import sys
 import requests
 
-from os.path import basename
-
 from swh.core.config import SWHConfig
 from .request import RepositorySearch, PassphraseSearch
 from .request import DiffusionUriEdit, RepositoriesToMirror
@@ -35,7 +33,7 @@ def mirror_exists(data):
     return False
 
 
-def format_repo_information(data, org_name):
+def format_repo_information(data, forge_base_url, github_org_name):
     """Given information on repository, extract the needed information for
        mirroring.
 
@@ -47,35 +45,25 @@ def format_repo_information(data, org_name):
         dict with keys phid, description, url, name.
 
     """
-    uris = [u for u in data['attachments']['uris']['uris']
-            if not u['fields']['disabled']]
-    elected_url = None
+    name = None
+    url = None
+    forge_base_url = forge_base_url.rstrip('/')
+    if data['fields']['shortName']:
+        name = data['fields']['shortName']
+        url = '%s/source/%s/' % (forge_base_url, data['fields']['shortName'])
+    elif data['fields']['callsign']:
+        name = data['fields']['callsign']
+        url = '%s/diffusion/%s/' % (forge_base_url, data['fields']['callsign'])
+    else:
+        name = 'R%s' % data['id']
+        url = '%s/diffusion/%s/' % (forge_base_url, data['id'])
 
-    # Will try to retrieve the most relevant uri (https first)
-    for uri in uris:
-        if uri['fields']['builtin']['protocol'] != 'https':
-            continue
-
-        effective_url = uri['fields']['uri']['effective']
-        if effective_url.endswith('.git'):
-            elected_url = effective_url
-            break
-
-    # then fallback to any other if no https were found
-    if not elected_url:
-        for uri in uris:
-            effective_url = uri['fields']['uri']['effective']
-            if effective_url.endswith('.git'):
-                elected_url = effective_url
-                break
-
-    name = basename(elected_url).split('.')[0]
     return {
         'phid': data['phid'],
         'description': data['fields']['name'],
-        'url': elected_url,
+        'url': url,
         'name': name,
-        'url_github': 'git@github.com:%s/%s.git' % (org_name, name),
+        'url_github': 'git@github.com:%s/%s.git' % (github_org_name, name),
     }
 
 
@@ -236,7 +224,8 @@ Status: %s""" % (error_msg_action, repo['name'], r.status_code))
             print('** Bypassing check as requested **')
 
         # Retrieve exhaustive information on repository
-        repo = format_repo_information(repository_information, self.github_org)
+        repo = format_repo_information(repository_information, self.forge_url,
+                                       self.github_org)
         if not repo:
             raise ValueError('Error when trying to retrieve detailed'
                              ' information on the repository')
@@ -327,7 +316,8 @@ Status: %s""" % (error_msg_action, repo['name'], r.status_code))
         repository_information = self.get_repo_info(repo_id)
 
         # Retrieve exhaustive information on repository
-        repo = format_repo_information(repository_information, self.github_org)
+        repo = format_repo_information(repository_information, self.forge_url,
+                                       self.github_org)
         if not repo:
             raise ValueError('Error when trying to retrieve detailed'
                              ' information on the repository')
