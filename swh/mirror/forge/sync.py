@@ -401,7 +401,7 @@ def mirror(repo_id, credential_key_id, bypass_check, dry_run):
 
     try:
         repo_id = int(repo_id)
-    except:
+    except Exception:
         pass
 
     msg = ''
@@ -500,7 +500,7 @@ def update_github_mirror(repo_id, dry_run):
 
     try:
         repo_id = int(repo_id)
-    except:
+    except Exception:
         pass
 
     msg = ''
