@@ -410,7 +410,7 @@ def cli(): pass
               help="Repository's identifier (either callsign, id or phid)")
 @click.option('--credential-key-id',
               help="""credential to use for access from phabricator's forge to
-                      github""")
+                      github""", default=3)
 @click.option('--dry-run/--no-dry-run', default=False)
 def mirror(repo_id, credential_key_id, dry_run):
     """Shell interface to instantiate a mirror from a repository forge to
@@ -462,10 +462,10 @@ def mirror(repo_id, credential_key_id, dry_run):
 @cli.command()
 @click.option('--query-repositories',
               help="""Name of the query that lists the repositories to mirror
-                      in github.""")
+                      in github.""", default='ROVTN3I11YIT')
 @click.option('--credential-key-id',
               help="""credential to use for access from phabricator's forge to
-                      github""")
+                      github""", default=3)
 @click.option('--dry-run/--no-dry-run', default=False,
               help="""Do nothing but read and print what would
                       actually happen without the flag.""")
@@ -514,9 +514,6 @@ def update_github_mirror(repo_id, dry_run):
                        used to fetch information on the repository to
                        mirror.
 
-        credential_key_id: the key the forge will use to push to
-                           modifications to github
-
         dry_run: if True, inhibit the mirror creation (no write is
                 done to either github) or the forge.  Otherwise, the
                 default, it creates the mirror to github. Also, a
@@ -549,7 +546,7 @@ def update_github_mirror(repo_id, dry_run):
 @cli.command()
 @click.option('--query-repositories',
               help="""Name of the query that lists the repositories to mirror
-                      in github.""")
+                      in github.""", default='ROVTN3I11YIT')
 @click.option('--dry-run/--no-dry-run', default=False,
               help="""Do nothing but read and print what would
                       actually happen without the flag.""")
