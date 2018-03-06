@@ -202,11 +202,13 @@ class SWHMirrorForge(SWHConfig):
         r = query_fn(
             url=api_url,
             headers=request_headers,
-            data=project_data)
+            json=expected_project_data)
 
         if not r.ok:
-            raise ValueError("""Failure to %s the repository '%s' in github.
-Status: %s""" % (error_msg_action, repo['name'], r.status_code))
+            raise ValueError(
+                "Failure to %s the repository '%s' in github. Status: %s (%s)"
+                % (error_msg_action, repo['name'], r.status_code, r.json())
+            )
 
     def mirror_repo_to_github(self, repo_id, credential_key_id,
                               dry_run=False):
@@ -299,7 +301,6 @@ Status: %s""" % (error_msg_action, repo['name'], r.status_code))
                     exists['phid'], exists['effective'], repo['url_github']))
 
         if not dry_run:
-            print(transaction_data)
             DiffusionUriEdit(self.forge_url, self.forge_token).post(
                 transaction_data
             )
