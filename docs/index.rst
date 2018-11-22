@@ -8,14 +8,10 @@ Custom utilities to keep up-to-date a `GitHub mirror
 development forge <https://github.com/softwareheritage>`_.
 
 
+Reference Documentation
+-----------------------
+
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
 
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
+   /apidoc/swh.mirror.forge
