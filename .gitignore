@@ -9,3 +9,5 @@ __pycache__
 version.txt
 build/
 dist/
+.mypy_cache/
+.tox/
